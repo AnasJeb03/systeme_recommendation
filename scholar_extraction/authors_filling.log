@@ -1,0 +1,10 @@
+2025-04-16 18:24:16,259 - INFO - === DÉBUT DU PROCESSUS DE REMPLISSAGE DES AUTEURS ===
+2025-04-16 18:24:16,259 - INFO - Tentative de connexion avec URI: mongodb://localhost:27017/
+2025-04-16 18:24:16,259 - INFO - Tentative de connexion à MongoDB (1/5)...
+2025-04-16 18:24:16,273 - INFO - Connexion à MongoDB établie avec succès!
+2025-04-16 18:24:18,248 - INFO - Chargement de 41085 publications dans le DataFrame
+2025-04-16 18:24:18,466 - INFO - Extraction des informations des auteurs...
+2025-04-16 18:24:22,833 - INFO - Nombre d'auteurs extraits: 103354
+2025-04-16 18:24:22,844 - ERROR - Erreur lors de la mise à jour des auteurs dans MongoDB: 'authors'
+2025-04-16 18:24:22,845 - ERROR - Le processus de remplissage des auteurs a échoué
+2025-04-16 18:24:22,846 - INFO - Connexion à MongoDB fermée.

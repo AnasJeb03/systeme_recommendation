@@ -1,0 +1,6 @@
+db_cleaning.log
+scholar_extraction/direct_cleaning.log
+scholar_extraction/fill_authors.py
+Modele/Modele_basé_sur_contenu/model_cache/publication_vectors.pkl
+Modele/Modele_basé_sur_contenu/model_cache/publications_df.pkl
+Modele/Modele_basé_sur_contenu/model_cache/vectorizer.pkl

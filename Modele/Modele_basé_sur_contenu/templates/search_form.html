@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système de Recommandation pour la Recherche</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #results {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        .recommendation {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .recommendation h3 {
+            margin-top: 0;
+        }
+        .keywords {
+            font-style: italic;
+            color: #666;
+        }
+        .loading {
+            text-align: center;
+            display: none;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: white;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Système de Recommandation d'Articles de Recherche</h1>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="domain-tab">Recherche par Domaine</div>
+            <div class="tab" data-tab="abstract-tab">Recherche par Résumé</div>
+        </div>
+        
+        <!-- Formulaire de recherche par domaine -->
+        <div id="domain-tab" class="tab-content active">
+            <form id="domainForm" class="search-form">
+                <div class="form-group">
+                    <label for="name-domain">Nom du doctorant:</label>
+                    <input type="text" id="name-domain" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="domain">Domaine de Recherche:</label>
+                    <input type="text" id="domain" name="domain" required 
+                           placeholder="Ex: intelligence artificielle, apprentissage automatique, etc.">
+                </div>
+                
+                <input type="hidden" name="search_type" value="domain">
+                <button type="submit">Rechercher</button>
+            </form>
+        </div>
+        
+        <!-- Formulaire de recherche par résumé -->
+        <div id="abstract-tab" class="tab-content">
+            <form id="abstractForm" class="search-form">
+                <div class="form-group">
+                    <label for="name-abstract">Nom du doctorant:</label>
+                    <input type="text" id="name-abstract" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="abstract">Résumé de Publication:</label>
+                    <textarea id="abstract" name="abstract" required 
+                             placeholder="Collez ici le résumé d'une publication pour trouver des articles similaires..."></textarea>
+                </div>
+                
+                <input type="hidden" name="search_type" value="abstract">
+                <button type="submit">Rechercher</button>
+            </form>
+        </div>
+                
+        <div class="loading" id="loading">
+            <p>Recherche en cours...</p>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Gestion des onglets
+        document.querySelectorAll('.tab').forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                // Désactiver tous les onglets et contenus
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // Activer l'onglet cliqué et son contenu
+                this.classList.add('active');
+                document.getElementById(this.getAttribute('data-tab')).classList.add('active');
+            });
+        });
+        
+        // Fonction pour soumettre les formulaires
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const formData = new FormData(form);
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            
+            loading.style.display = 'block';
+            results.innerHTML = '';
+            
+            fetch('/recommend', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                
+                if (data.error) {
+                    results.innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+                
+                let html = `<h2>Résultats pour: ${data.doctorant}</h2>`;
+                html += `<p>Type de recherche: ${data.search_type === 'domain' ? 'Par domaine' : 
+                                               data.search_type === 'abstract' ? 'Par résumé' : 'Par ID publication'}</p>`;
+                html += `<p>Requête: "${data.query}"</p>`;
+                
+                if (!data.recommendations || data.recommendations.length === 0) {
+                    html += '<p>Aucune recommandation trouvée.</p>';
+                } else {
+                    data.recommendations.forEach((rec, index) => {
+                        html += `
+                            <div class="recommendation">
+                                <h3>${index + 1}. ${rec.title}</h3>
+                                <p>${rec.abstract || 'Pas de résumé disponible'}</p>
+                                <p class="keywords">Mots-clés: ${rec.keywords && rec.keywords.length ? rec.keywords.join(', ') : 'Aucun'}</p>
+                                <p>Score de similarité: ${(rec.similarity_score * 100).toFixed(2)}%</p>
+                                ${rec.url ? `<p><a href="${rec.url}" target="_blank">Voir l'article</a></p>` : ''}
+                            </div>
+                        `;
+                    });
+                }
+                
+                results.innerHTML = html;
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                results.innerHTML = `<p class="error">Erreur: ${error.message}</p>`;
+                console.error('Error:', error);
+            });
+        }
+        
+        // Ajouter les gestionnaires d'événements pour tous les formulaires
+        document.querySelectorAll('.search-form').forEach(form => {
+            form.addEventListener('submit', handleFormSubmit);
+        });
+    </script>
+</body>
+</html>
