@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: recommandation-articles
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+      - model_cache:/app/model_cache
+    environment:
+      - MONGO_URI=mongodb+srv://root:root@projet.orx8tzk.mongodb.net/  # URL correcte pour accéder à MongoDB
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - mongodb
+    networks:
+      - recommandation-network
+
+  mongodb:
+    image: mongo:5.0
+    container_name: mongodb-recommandation
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    environment:
+      - MONGO_INITDB_DATABASE=Donnees
+    networks:
+      - recommandation-network
+
+networks:
+  recommandation-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  model_cache:

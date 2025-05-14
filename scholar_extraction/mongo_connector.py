@@ -5,14 +5,21 @@ import os
 import time
 import logging
 
-# Ajouter le répertoire parent au chemin pour importer config
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import MONGO_URI, MONGO_DB_NAME, COLLECTIONS
-
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Dans Docker, utiliser le nom du service comme hôte
+MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://mongodb:27017/Donnees')
+MONGO_DB_NAME = 'Donnees'
+
+# Définir les collections si nécessaire
+COLLECTIONS = {
+    'PUBLICATIONS': 'publications',
+    'AUTEURS': 'auteurs',
+    'RECOMMENDATIONS': 'recommendations'
+}
 
 class MongoConnector:
     _instance = None

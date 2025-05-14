@@ -138,7 +138,75 @@ class DomainBasedRecommender:
             print(f"Erreur lors du chargement des publications: {e}")
             # Utiliser des données de test en cas d'erreur
             self.load_test_data()
-            
+    def load_test_data(self):
+        """
+        Charge des données de test quand la connexion à MongoDB n'est pas disponible.
+        Cette méthode est appelée en mode de secours quand load_publications() échoue.
+        """
+        import pandas as pd
+        import os
+        import logging
+        
+        # Configurer un logger si besoin
+        if not hasattr(self, 'logger'):
+            self.logger = logging.getLogger('test_data_loader')
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
+        
+        self.logger.info("Chargement des données de test pour le développement...")
+        print("Chargement des données de test pour le développement...")
+        
+        # Créer un DataFrame avec quelques exemples de publications
+        test_data = [
+            {
+                "_id": "test1",
+                "title": "Introduction à l'apprentissage automatique",
+                "abstract": "Cet article présente les concepts fondamentaux de l'apprentissage automatique et ses applications.",
+                "authors": ["A. Smith", "B. Johnson"],
+                "year": 2023,
+                "keywords": ["machine learning", "AI", "data science"]
+            },
+            {
+                "_id": "test2",
+                "title": "Systèmes de recommandation basés sur le contenu",
+                "abstract": "Étude des systèmes de recommandation utilisant la similarité de contenu pour proposer des items pertinents.",
+                "authors": ["C. Williams", "D. Brown"],
+                "year": 2022,
+                "keywords": ["recommendation systems", "content-based filtering", "similarity measures"]
+            },
+            {
+                "_id": "test3",
+                "title": "Applications des réseaux de neurones",
+                "abstract": "Analyse des applications pratiques des réseaux de neurones dans divers domaines industriels.",
+                "authors": ["E. Davis", "F. Miller"],
+                "year": 2024,
+                "keywords": ["neural networks", "deep learning", "applications"]
+            }
+        ]
+        
+        # Convertir en DataFrame
+        self.publications = pd.DataFrame(test_data)
+        
+        # Initialiser le vectorizer si nécessaire
+        if not hasattr(self, 'vectorizer') or self.vectorizer is None:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            self.vectorizer = TfidfVectorizer(stop_words='english')
+            # Construire le vectorizer avec les textes disponibles
+            combined_texts = self.publications['title'] + " " + self.publications['abstract']
+            self.vectorizer.fit(combined_texts)
+        
+        # S'assurer que la méthode index_publications existe
+        if hasattr(self, 'index_publications'):
+            # Vectoriser les textes
+            self.index_publications()
+        else:
+            print("Avertissement: Méthode index_publications non disponible.")
+        
+        self.logger.info(f"Données de test chargées avec succès. {len(self.publications)} publications disponibles.")
+        print(f"Données de test chargées avec succès. {len(self.publications)} publications disponibles.")  
     def preprocess_text(self, text):
             """Prétraite le texte: tokenization, suppression des stopwords, lemmatisation"""
             if isinstance(text, str):
@@ -205,9 +273,10 @@ class DomainBasedRecommender:
             if nom in self.test_doctorants:
                 return self.test_doctorants[nom]
                 
-            # Créer un nouveau profil de doctorant en mémoire
+            # Créer un nouveau profil de doctorant en mémoire avec un ObjectId valide
+            import bson
             new_doctorant = {
-                "_id": ObjectId(str(len(self.test_doctorants) + 1)),
+                "_id": bson.ObjectId(),  # Génère un vrai ObjectId valide
                 "nom": nom,
                 "email": email,
                 "interests": interests if interests else [],

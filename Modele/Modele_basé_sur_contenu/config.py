@@ -1,6 +1,6 @@
 import os
 # Configuration MongoDB
-MONGO_URI = "mongodb://localhost:27017"
+MONGO_URI = "mongodb://localhost:27017"  
 MONGO_DB_NAME = "Donnees"
 COLLECTIONS = {
     "chercheurs": "auteurs",

@@ -1,0 +1,5 @@
+2025-05-13 22:59:54,432 - __main__ - INFO - Répertoire créé: C:\Users\ANAS\Desktop\systeme_recommendation\model_cache
+2025-05-13 22:59:54,433 - __main__ - INFO - Répertoire créé: C:\Users\ANAS\Desktop\systeme_recommendation\model_cache\logs
+2025-05-13 22:59:54,434 - __main__ - INFO - Répertoire créé: C:\Users\ANAS\Desktop\systeme_recommendation\model_cache\feedback
+2025-05-13 23:00:00,615 - __main__ - INFO - Module de recommandation importé avec succès
+2025-05-13 23:00:05,516 - urllib3.connectionpool - WARNING - Retrying (Retry(total=6, connect=6, read=7, redirect=7, status=7)) after connection broken by 'NewConnectionError('<urllib3.connection.HTTPConnection object at 0x00000208F8974CE0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it')': /api/2.0/mlflow/experiments/get-by-name?experiment_name=automation_pipeline

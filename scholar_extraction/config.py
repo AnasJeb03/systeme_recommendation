@@ -1,6 +1,6 @@
 import os
 # Configuration MongoDB
-MONGO_URI = "mongodb://localhost:27017"
+MONGO_URI = os.getenv("MONGODB_URI", "mongodb+srv://root:root@projet.orx8tzk.mongodb.net/")
 MONGO_DB_NAME = "Donnees"
 COLLECTIONS = {
     "chercheurs": "auteurs",
