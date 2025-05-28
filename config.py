@@ -2,7 +2,7 @@
 import os
 
 # Configuration MongoDB
-MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://mongodb:27017/Donnees')
+MONGO_URI = os.environ.get('MONGO_URI', 'mongodb+srv://root:root@projet.orx8tzk.mongodb.net/')
 MONGO_DB_NAME = 'Donnees'
 
 # Définir les collections

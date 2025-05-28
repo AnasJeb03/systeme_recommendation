@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  airflow-webserver:
+    build:
+      context: ..
+      dockerfile: ./automation/Dockerfile
+    container_name: recommandation-airflow-webserver
+    restart: unless-stopped
+    ports:
+      - "8080:8080"  # Interface web Airflow
+    volumes:
+      - ./model_cache:/app/model_cache
+      - ./airflow/logs:/app/airflow/logs
+      - ./airflow/dags:/app/airflow/dags
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////app/airflow/airflow.db
+      - MONGO_URI=mongodb://mongodb:27017/
+      - MONGO_DB_NAME=recommandation
+      - TEST_MODE=False
+    command: airflow webserver -p 8080
+    depends_on:
+      - mongodb
+      - mlflow
+      - airflow-init
+
+  airflow-scheduler:
+    build:
+      context: ..
+      dockerfile: ./automation/Dockerfile
+    container_name: recommandation-airflow-scheduler
+    restart: unless-stopped
+    volumes:
+      - ./model_cache:/app/model_cache
+      - ./airflow/logs:/app/airflow/logs
+      - ./airflow/dags:/app/airflow/dags
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////app/airflow/airflow.db
+      - MONGO_URI=mongodb://mongodb:27017/
+      - MONGO_DB_NAME=recommandation
+      - TEST_MODE=False
+    command: airflow scheduler
+    depends_on:
+      - airflow-webserver
+
+  airflow-init:
+    build:
+      context: ..
+      dockerfile: ./automation/Dockerfile
+    container_name: recommandation-airflow-init
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////app/airflow/airflow.db
+    volumes:
+      - ./airflow:/app/airflow
+    command: >
+      bash -c "airflow db init &&
+              airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
+
+  pipeline-auto:
+    build:
+      context: ..
+      dockerfile: ./automation/Dockerfile
+    container_name: recommandation-pipeline
+    restart: "no"
+    volumes:
+      - ./model_cache:/app/model_cache
+      - ./logs:/app/logs
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/
+      - MONGO_DB_NAME=recommandation
+      - TEST_MODE=False
+    # Utilise la commande CMD définie dans le Dockerfile (python /app/automation/pipeline_automatisation.py)
+    depends_on:
+      - mongodb
+      - mlflow
+      - airflow-scheduler
+
+  mongodb:
+    image: mongo:5.0
+    container_name: recommandation-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=recommandation
+
+  mlflow:
+    image: python:3.9-slim
+    container_name: recommandation-mlflow
+    restart: unless-stopped
+    command: >
+      bash -c "pip install mlflow==2.3.1 psycopg2-binary && 
+              mlflow server --host 0.0.0.0 --port 5000"
+    ports:
+      - "5000:5000"  # Interface web MLflow
+    volumes:
+      - ./mlflow_data:/mlruns
+    environment:
+      - MLFLOW_TRACKING_URI=/mlruns
+
+volumes:
+  mongodb_data:

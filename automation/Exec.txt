@@ -1,0 +1,5 @@
+Si vous souhaitez lancer manuellement le pipeline après avoir démarré les services, vous pouvez simplement :
+-docker-compose restart pipeline-auto
+Ou pour l'exécuter une seule fois sans redémarrer le conteneur :
+-docker-compose run --rm pipeline-auto
+

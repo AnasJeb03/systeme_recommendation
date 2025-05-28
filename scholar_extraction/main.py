@@ -3,7 +3,6 @@ from extractors.hal import HALExtractor
 from processors.cleaner import DataCleaner
 from processors.stats_generator import StatsGenerator
 from database.repository import ScholarRepository
-from extractors.semantic_scholar import SemanticScholarExtractor
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 import time
@@ -20,7 +19,7 @@ def process_researcher(name, affiliation=None, sources=None):
     """
     # Initialiser les sources d'extraction
     if sources is None:
-        sources = ['google_scholar', 'hal', 'semantic_scholar']
+        sources = ['google_scholar', 'hal']
     
     # Initialiser le repository
     repo = ScholarRepository()
@@ -52,15 +51,6 @@ def process_researcher(name, affiliation=None, sources=None):
             hal_publications = extract_publications_from_hal(name, chercheur_id, repo)
             all_publications.extend(hal_publications)
             print(f"Nombre de publications trouvées sur HAL: {len(hal_publications)}")
-        # ===== EXTRACTION DEPUIS SEMANTIC SCHOLAR =====
-        if 'semantic_scholar' in sources:
-            print("=== Extraction depuis Semantic Scholar ===")
-            if not chercheur_id:
-                chercheur_id = extract_researcher_from_semantic_scholar(name, repo)
-            
-            semantic_publications = extract_publications_from_semantic_scholar(name, chercheur_id, repo)
-            all_publications.extend(semantic_publications)
-            print(f"Nombre de publications trouvées sur Semantic Scholar: {len(semantic_publications)}")
         
         # Si aucune publication n'a été trouvée, on s'arrête là
         if not all_publications:
@@ -93,7 +83,7 @@ def process_publications_by_keywords(keywords_list, sources=None,languages=None)
     """
     # Initialiser les sources d'extraction
     if sources is None:
-        sources = ['google_scholar', 'hal', 'semantic_scholar']
+        sources = ['google_scholar', 'hal']
     
     # Initialiser les langues
     if languages is None:
@@ -115,216 +105,12 @@ def process_publications_by_keywords(keywords_list, sources=None,languages=None)
             if 'hal' in sources:
                 print(f"Extraction depuis HAL pour le mot-clé: {keyword}")
                 extract_publications_by_keyword_from_hal(keyword, repo, languages)
-            if 'semantic_scholar' in sources:
-                print(f"Extraction depuis Semantic Scholar pour le mot-clé: {keyword}")
-                extract_publications_by_keyword_from_semantic_scholar(keyword, repo, languages)
-
             print(f"Traitement terminé pour le mot-clé: {keyword}")
             time.sleep(2)  # Pause entre les mots-clés pour éviter de surcharger les APIs
     
     finally:
         # Fermer la connexion à la base de données
         repo.close()
-
-def extract_researcher_from_semantic_scholar(name, repo):
-    """Créé une entrée pour le chercheur basée sur les données Semantic Scholar ou récupère l'ID existant"""
-    # Vérifier si le chercheur existe déjà
-    existing_researcher = repo.find_researcher_by_name(name)
-    
-    if existing_researcher:
-        chercheur_id = existing_researcher["_id"]
-        print(f"Chercheur existant trouvé avec ID: {chercheur_id}")
-        
-        # Ajouter Semantic Scholar aux sources si pas déjà présent
-        if "semantic_scholar" not in existing_researcher.get("sources", []):
-            update_doc = {
-                "sources": existing_researcher.get("sources", []) + ["semantic_scholar"]
-            }
-            repo.update_researcher(chercheur_id, update_doc)
-            print("Source Semantic Scholar ajoutée au chercheur existant")
-        
-        return chercheur_id
-    else:
-        # Extraire des données sur le chercheur depuis Semantic Scholar
-        semantic_extractor = SemanticScholarExtractor()
-        publications = semantic_extractor.extract_by_author(name)
-        
-        # Initialiser les informations du chercheur
-        affiliation = ""
-        interests = []
-        citations_total = 0
-        
-        # Essayer d'extraire l'affiliation et les intérêts à partir des publications
-        if publications:
-            # Extraire les mots-clés/intérêts à partir des abstracts
-            combined_text = " ".join([pub.get('abstract', '') for pub in publications])
-            interests = DataCleaner.extract_technical_keywords(combined_text, max_keywords=10)
-            
-            # Calculer le nombre total de citations
-            citations_total = sum(pub.get('citations', 0) for pub in publications)
-        
-        # Créer un nouveau chercheur
-        chercheur_doc = {
-            "nom": name,
-            "affiliation": affiliation,
-            "h_index": 0,  # Semantic Scholar ne fournit pas directement cette information
-            "i10_index": 0,  # Semantic Scholar ne fournit pas cette information
-            "citations_total": citations_total,
-            "interests": interests,
-            "scholar_id": "",
-            "url_profile": "",
-            "sources": ["semantic_scholar"],
-            "date_creation": pd.Timestamp.now().isoformat()
-        }
-        
-        # Stocker le chercheur et récupérer son ID
-        chercheur_id = repo.save_researcher(chercheur_doc)
-        print(f"Chercheur ajouté depuis Semantic Scholar avec ID: {chercheur_id}")
-    
-    return chercheur_id
-def extract_publications_from_semantic_scholar(name, chercheur_id, repo):
-    """Extrait les publications depuis Semantic Scholar pour un chercheur donné"""
-    # Initialiser l'extracteur Semantic Scholar
-    semantic_extractor = SemanticScholarExtractor()
-    
-    # Extraire les publications
-    semantic_publications = semantic_extractor.extract_by_author(name)
-    
-    # Préparer les documents pour MongoDB
-    publications_docs = []
-    for pub in semantic_publications:
-        title = pub.get('title', '')
-        pub_year = pub.get('year', '')
-        
-        # Vérifier si la publication existe déjà
-        existing_pub = repo.find_similar_publication(chercheur_id, title, pub_year)
-        if existing_pub:
-            print(f"Publication déjà existante dans Semantic Scholar: {title}")
-            continue
-        
-        # Si la publication n'existe pas encore
-        full_abstract = pub.get('abstract', '')
-        short_summary = DataCleaner.generate_short_summary(full_abstract, max_length=250)
-        text = f"{title} {full_abstract}"
-        keywords = DataCleaner.extract_keywords(text)
-        
-        pub_doc = {
-            "title": title,
-            "abstract_full": full_abstract,
-            "abstract_short": short_summary,
-            "authors": pub.get('authors', []),
-            "year": pub_year,
-            "venue": pub.get('journal', ''),
-            "citations": pub.get('citations', 0),
-            "url": pub.get('url', ''),
-            "semantic_scholar_id": pub.get('id', ''),
-            "doi": pub.get('doi', ''),
-            "chercheur_id": chercheur_id,
-            "keywords": keywords,
-            "source": "semantic_scholar",
-            "date_extraction": pd.Timestamp.now().isoformat()
-        }
-        publications_docs.append(pub_doc)
-    
-    # Stocker les publications
-    if publications_docs:
-        pub_ids = repo.save_publications(publications_docs)
-        print(f"{len(pub_ids)} publications ajoutées à MongoDB depuis Semantic Scholar")
-        
-        # Enrichir les publications avec des mots-clés techniques
-        for i, pub_id in enumerate(pub_ids):
-            # Nettoyer le titre
-            title = DataCleaner.clean_title(publications_docs[i]["title"])
-            
-            # Extraction plus approfondie des mots-clés
-            text = f"{publications_docs[i]['title']} {publications_docs[i]['abstract_full']}"
-            enhanced_keywords = DataCleaner.extract_technical_keywords(text)
-            
-            # Mettre à jour la publication
-            repo.update_publication(pub_id, {
-                "title": title,
-                "keywords": enhanced_keywords
-            })
-    
-    return publications_docs
-def extract_publications_by_keyword_from_semantic_scholar(keyword, repo, languages=None, batch_size=100):
-    """Extrait les publications depuis Semantic Scholar pour un mot-clé donné"""
-    # Initialiser l'extracteur Semantic Scholar
-    semantic_extractor = SemanticScholarExtractor()
-    
-    # Extraire les publications
-    semantic_publications = semantic_extractor.extract_by_keyword(keyword, languages)
-    total_publications = len(semantic_publications)
-    print(f"Début du traitement et de l'insertion de {total_publications} publications dans MongoDB...")
-    
-    # Traiter les publications par lots
-    publications_docs_all = []
-    pub_ids_all = []
-    
-    for i in range(0, total_publications, batch_size):
-        batch = semantic_publications[i:i+batch_size]
-        print(f"Traitement du lot {i//batch_size + 1}/{(total_publications-1)//batch_size + 1} ({len(batch)} publications)")
-        
-        # Préparer les documents pour MongoDB
-        publications_docs = []
-        for pub in batch:
-            title = pub.get('title', '')
-            pub_year = pub.get('year', '')
-            
-            # Vérifier si la publication existe déjà
-            existing_pub = repo.find_similar_publication_by_title(title, pub_year)
-            if existing_pub:
-                continue
-            
-            full_abstract = pub.get('abstract', '')
-            short_summary = DataCleaner.generate_short_summary(full_abstract, max_length=250)
-            text = f"{title} {full_abstract}"
-            keywords = DataCleaner.extract_keywords(text)
-            
-            pub_doc = {
-                "title": title,
-                "abstract_full": full_abstract,
-                "abstract_short": short_summary,
-                "authors": pub.get('authors', []),
-                "year": pub_year,
-                "venue": pub.get('journal', ''),
-                "citations": pub.get('citations', 0),
-                "url": pub.get('url', ''),
-                "semantic_scholar_id": pub.get('id', ''),
-                "doi": pub.get('doi', ''),
-                "keywords": keywords,
-                "search_keyword": keyword,
-                "source": "semantic_scholar",
-                "date_extraction": pd.Timestamp.now().isoformat()
-            }
-            publications_docs.append(pub_doc)
-        
-        # Stocker le lot de publications
-        if publications_docs:
-            try:
-                pub_ids = repo.save_publications(publications_docs)
-                print(f"Lot {i//batch_size + 1}: {len(pub_ids)} publications ajoutées à MongoDB")
-                pub_ids_all.extend(pub_ids)
-                publications_docs_all.extend(publications_docs)
-                
-                # Enrichir les publications avec des mots-clés techniques
-                for j, pub_id in enumerate(pub_ids):
-                    if j % 50 == 0:
-                        print(f"Enrichissement des publications: {j}/{len(pub_ids)}")
-                    
-                    title = DataCleaner.clean_title(publications_docs[j]["title"])
-                    text = f"{publications_docs[j]['title']} {publications_docs[j]['abstract_full']}"
-                    enhanced_keywords = DataCleaner.extract_technical_keywords(text)
-                    
-                    repo.update_publication(pub_id, {
-                        "title": title,
-                        "keywords": enhanced_keywords
-                    })
-            except Exception as e:
-                print(f"Erreur lors du traitement du lot {i//batch_size + 1}: {str(e)}")
-    
-    print(f"Traitement terminé. {len(pub_ids_all)} publications ajoutées sur {total_publications} extraites.")
-    return publications_docs_all
 def extract_publications_by_keyword_from_google_scholar(keyword, repo, languages=None):
     """Extrait les publications depuis Google Scholar pour un mot-clé donné"""
     # Rechercher les publications par mot-clé
@@ -809,135 +595,12 @@ if __name__ == "__main__":
     
     """
     chercheurs = [
-    "Barrandon Ludovic",
-    "Benhabib Karim",
-    "Cochard Gérard-Michel",
-    "Chkir Mouna",
-    "Coorevits Patrice",
-    "Dahmani Isma",
-    "Hernandez Marisela",
-    "Hifi Mhand",
-    "Lazure Dominique",
-    "Marie Christophe",
-    "Negre Stéphane",
-    "Montrelay Nicolas",
-    "Nguyen Vietdung",
-    "Pierens Xavier",
-    "Saadi Toufik",
-    "Saint Fabien",
-    "Tassin Regis",
-    "T'Kint Michèle",
-    "Wu Lei",
-    "Youssef Labib",
-    "ABDI DAHER Oumalkaire",
-    "DOUMBOUYA Naby",
-    "Boulebene Sabrine",
-    "Brahimi Sihem",
-    "Dey Imène",
-    "Latram Khadidja",
-    "Samod Elmi Samod",
-    "Belhadj Narjes",
-    "Gacem Oussama",
-    "Baatout Fatma Zohra",
-    "Boukhari Samah",
-    "Ferroum Meriem",
-    "Youssouf Amir Mohamed",
-    "Sadeghsa Shohre",
-    "NGUYEN Thi Le Quyen",
-    "Thekra Al-Douri",
-    "Moudher Al-Hameed",
-    "Najat Al-Hameed",
-    "Al-Mohamadawi Ali",
-    "Ferhan Al-Maliky",
-    "Mohamad Ali",
-    "Sherko Arkawazi",
-    "Belhadj Belkacem",
-    "Hiba Bederina",
-    "Ahmed Bellil",
-    "Adel Bouchekhchoukha",
-    "Isma Dahmani",
-    "Nawal Haddadou",
-    "Tayeb Hocine",
-    "Habib Kadari",
-    "Rézika Kheffache",
-    "Asma Mansri",
-    "Laurent Moreau",
-    "Ibrahim Moussa",
-    "Orwa Omran",
-    "Sagvan Saleh",
-    "Labib Yousef",
-    "Ines Zarrad",
-    "Ahmed Ziregue"
     ]
     
-    """
+   
     keywords = [
-    # Apprentissage automatique avancé
-    "deep learning architecture optimization", "transformer neural networks", "contrastive learning frameworks",
-    "bayesian neural networks", "probabilistic graphical models", "variational inference methods",
-    "reinforcement learning algorithms", "deep Q-networks", "policy gradient methods", "actor-critic algorithms",
-    "multi-agent reinforcement learning", "game theory optimization", "nash equilibrium in ML",
-    
-    # IA théorique et mathématique
-    "computational learning theory", "PAC learning", "statistical learning bounds",
-    "information theoretic learning", "Kolmogorov complexity", "minimum description length",
-    "kernel methods", "reproducing kernel Hilbert spaces", "support vector theory",
-    "optimization algorithms", "stochastic gradient descent convergence", "second-order optimization methods",
-    "non-convex optimization", "saddle point problems", "manifold optimization techniques",
-    
-    # Traitement automatique des langues
-    "neural machine translation models", "cross-lingual representation learning", "multilingual transformers",
-    "language model pretraining techniques", "contextualized word embeddings", "token classification tasks",
-    "discourse analysis algorithms", "coreference resolution models", "syntactic parsing methods",
-    "sequence-to-sequence architectures", "attention mechanism variants", "transformer decoder analysis",
-    
-    # Vision par ordinateur
-    "convolutional neural network architectures", "object detection algorithms", "Faster R-CNN variants",
-    "semantic segmentation methods", "instance segmentation techniques", "panoptic segmentation frameworks",
-    "visual reasoning models", "scene graph generation", "visual question answering architectures",
-    "3D reconstruction algorithms", "structure from motion techniques", "neural radiance fields",
-    
-    # Systèmes de recommandation et graphes
-    "graph convolutional networks", "graph attention networks", "graph representation learning",
-    "knowledge graph embedding models", "entity alignment techniques", "ontology reasoning algorithms",
-    "collaborative filtering algorithms", "matrix factorization techniques", "factorization machines",
-    "session-based recommendation models", "sequential recommendation algorithms", "user preference modeling",
-    
-    # Apprentissage automatique spécialisé
-    "meta-learning algorithms", "few-shot classification methods", "prototypical networks",
-    "self-supervised representation learning", "contrastive predictive coding", "bootstrap your own latent",
-    "transfer learning techniques", "domain adaptation methods", "adversarial domain adaptation",
-    "continual learning approaches", "catastrophic forgetting mitigation", "elastic weight consolidation",
-    
-    # Modèles génératifs
-    "variational autoencoders", "normalizing flows", "autoregressive models",
-    "generative adversarial network architectures", "StyleGAN innovations", "adversarial training stability",
-    "diffusion probabilistic models", "score-based generative models", "denoising diffusion techniques",
-    "energy-based models", "Langevin dynamics", "MCMC sampling methods for generative models",
-    
-    # Séries temporelles et anomalies
-    "recurrent neural network variants", "gated recurrent architectures", "temporal convolutional networks",
-    "state space models for time series", "Kalman filtering techniques", "hidden Markov models",
-    "multivariate time series forecasting", "temporal point processes", "neural ODE methods",
-    "density-based anomaly detection", "reconstruction-based anomaly detection", "deep SVDD methods",
-    
-    # MLOps et systèmes ML
-    "hyperparameter optimization techniques", "neural architecture search algorithms", "differentiable architecture search",
-    "ML system design patterns", "distributed training algorithms", "parameter server architectures",
-    "model quantization methods", "knowledge distillation techniques", "neural network pruning algorithms",
-    "hardware-aware neural networks", "ML compiler optimization", "accelerator-specific neural networks",
-    
-    # Éthique, explicabilité et robustesse
-    "algorithmic fairness metrics", "bias mitigation techniques", "fairness-aware learning algorithms",
-    "interpretable machine learning methods", "explainable AI frameworks", "feature attribution techniques",
-    "adversarial robustness methods", "certified robustness", "randomized smoothing techniques",
-    "privacy-preserving machine learning", "federated learning algorithms", "secure multi-party computation for ML",
-    
-    # Applications scientifiques et spécialisées
-    "computational biology deep learning", "protein structure prediction algorithms", "genomic sequence analysis",
-    "scientific machine learning", "physics-informed neural networks", "differential equation solvers",
-    "quantum machine learning algorithms", "quantum neural network architectures", "variational quantum algorithms",
-    "robotics reinforcement learning", "sim-to-real transfer methods", "imitation learning algorithms"
-]
-    process_publications_by_keywords(keywords,sources=["hal","google scholar"], languages=["en", "fr"])
+    "imitation learning algorithms"
+    ]
+    """
+    #process_publications_by_keywords(keywords,sources=["hal","google scholar"], languages=["en", "fr"])
     #process_multiple_researchers(chercheurs,sources=["google_scholar","hal"])

@@ -142,12 +142,6 @@ def health_check():
     # Point de terminaison pour vérifier si le serveur est en cours d'exécution
     return jsonify({"status": "ok"})
 
-@app.route('/popular-domains')
-def popular_domains():
-    # Récupérer les domaines les plus populaires
-    domains = recommender.get_popular_domains(limit=5)
-    return jsonify(domains)
-
 @app.route('/refresh-model', methods=['POST'])
 def refresh_model():
     # Endpoint pour rafraîchir le modèle manuellement si nécessaire

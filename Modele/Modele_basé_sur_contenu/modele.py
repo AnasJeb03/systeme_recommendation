@@ -514,30 +514,6 @@ class DomainBasedRecommender:
         
         return recommendations
 
-    def get_popular_domains(self, limit=10):
-        """Récupère les domaines les plus recherchés"""
-        if self.db is None:
-            # Mode test: calculer les domaines populaires à partir de l'historique en mémoire
-            domain_counts = {}
-            for record in self.test_search_history:
-                domain = record["domain"]
-                domain_counts[domain] = domain_counts.get(domain, 0) + 1
-                
-            # Convertir en format similaire à l'agrégation MongoDB
-            popular_domains = [{"_id": domain, "count": count} 
-                              for domain, count in sorted(domain_counts.items(), 
-                                                          key=lambda x: x[1], 
-                                                          reverse=True)[:limit]]
-            return popular_domains
-            
-        # Mode normal: utiliser MongoDB
-        pipeline = [
-            {"$group": {"_id": "$domain", "count": {"$sum": 1}}},
-            {"$sort": {"count": -1}},
-            {"$limit": limit}
-        ]
-        popular_domains = list(self.search_history_collection.aggregate(pipeline))
-        return popular_domains
     def refresh_model(self):
         """Rafraîchit le modèle pour intégrer de nouvelles publications"""
         print("Rafraîchissement du modèle en cours...")
