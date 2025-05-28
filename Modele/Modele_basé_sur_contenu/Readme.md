@@ -11,7 +11,6 @@ Le système est structuré autour de plusieurs composants principaux :
 ### 1. Extracteurs de Données
 - **GoogleScholarExtractor** : Interface avec Google Scholar pour récupérer des profils d'auteurs et leurs publications
 - **HALExtractor** : Interface avec l'API HAL (Hyper Articles en Ligne) pour extraire des publications françaises
-- **SemanticScholarExtractor** : Interface avec Semantic Scholar pour des données bibliographiques enrichies
 
 ### 2. Processeurs de Données
 - **DataCleaner** : Nettoyage et normalisation des données extraites
@@ -27,7 +26,7 @@ Le système est structuré autour de plusieurs composants principaux :
 Le système permet d'extraire toutes les publications d'un chercheur spécifique à partir de son nom et optionnellement de son affiliation :
 
 ```python
-process_researcher("Nom du Chercheur", affiliation="Université", sources=["google_scholar", "hal", "semantic_scholar"])
+process_researcher("Nom du Chercheur", affiliation="Université", sources=["google_scholar", "hal"])
 ```
 
 **Caractéristiques :**
@@ -65,11 +64,6 @@ Possibilité de traiter plusieurs chercheurs simultanément avec gestion des dé
 - **Avantages** : Archive ouverte française, données structurées, API stable
 - **Limitations** : Principalement francophone, pas de métriques de citations
 - **Données extraites** : Publications, abstracts, métadonnées bibliographiques
-
-### Semantic Scholar
-- **Avantages** : Données enrichies, abstracts complets, API fiable
-- **Limitations** : Couverture variable selon les domaines
-- **Données extraites** : Publications avec abstracts, citations, DOI
 
 ## Traitement des Données
 
