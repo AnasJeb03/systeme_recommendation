@@ -10,7 +10,6 @@ Ce module fait partie d’un système de collecte automatisée des publications 
 
 * **GoogleScholarExtractor** : Récupération des publications à partir des profils d’auteurs Google Scholar via `scholarly`.
 * **HALExtractor** : Interrogation de l’API HAL pour récupérer des publications francophones issues de l’archive ouverte.
-* **SemanticScholarExtractor** : Accès aux données enrichies de Semantic Scholar (résumés, DOI, citations...).
 
 ### 2. Traitement
 
